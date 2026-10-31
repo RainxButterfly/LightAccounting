@@ -1,0 +1,43 @@
+# Gradle
+.gradle/
+build/
+.gradle-home/
+.kotlin/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+.vscode/
+.fleet/
+*.iml
+*.hprof
+
+# 本地配置
+local.properties
+keystore.properties
+signing.properties
+
+# 签名文件
+*.jks
+*.keystore
+*.p12
+
+# 构建产物
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 日志与临时文件
+*.log
+*.tmp
+*.swp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地测试产物
+.shots/
