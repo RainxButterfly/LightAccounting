@@ -10,11 +10,19 @@
  * 说明: 应用模块构建配置
  */
 
+import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+}
+
+val signingProperties = Properties().apply {
+    val file = rootProject.file("signing.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -30,6 +38,17 @@ android {
         resourceConfigurations += listOf("zh", "en")
     }
 
+    signingConfigs {
+        if (signingProperties.isNotEmpty()) {
+            create("release") {
+                storeFile = rootProject.file(signingProperties.getProperty("storeFile"))
+                storePassword = signingProperties.getProperty("storePassword")
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -38,6 +57,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

@@ -69,9 +69,24 @@ Release 构建：
 ./gradlew assembleRelease
 ```
 
-Release 开启了 R8 代码压缩与资源压缩，产物位于 `app/build/outputs/apk/release/`。仓库不包含签名配置，发布前请在 Android Studio 中生成签名包，或在 `app/build.gradle.kts` 中添加自己的 `signingConfigs`。
+Release 开启了 R8 代码压缩与资源压缩，产物位于 `app/build/outputs/apk/release/`。
 
-自动更新要求后续版本始终使用同一个签名密钥，否则 Android 会拒绝安装。
+Release 签名从根目录的 `signing.properties` 读取，该文件已在 `.gitignore` 中忽略。首次配置时复制示例文件并填写本地 keystore 路径：
+
+```bash
+cp signing.properties.example signing.properties
+```
+
+```properties
+storeFile=/absolute/path/to/release.jks
+storePassword=your-store-password
+keyAlias=your-key-alias
+keyPassword=your-key-password
+```
+
+没有 `signing.properties` 时，Release 产物为未签名 APK。自动更新要求后续版本始终使用同一个签名密钥，否则 Android 会拒绝安装。
+
+本地发布用的签名包可以放在 `dist/`，该目录已加入忽略规则，不会进入版本库。
 
 运行单元测试与静态检查：
 
