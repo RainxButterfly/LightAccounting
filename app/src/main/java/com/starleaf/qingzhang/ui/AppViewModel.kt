@@ -490,6 +490,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val bookId = validBookId.value
             if (bookId <= 0 || accountId <= 0) return@launch
             val commit = repo.commitImport(bookId, accountId, rows)
+            if (commit.imported > 0) {
+                rows.maxOfOrNull { it.time }?.let { latest ->
+                    month.value = YearMonth.from(Dates.toLocalDate(latest))
+                }
+            }
             onResult(commit)
         }
     }

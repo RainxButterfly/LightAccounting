@@ -21,13 +21,16 @@ data class BillRow(
     val counterparty: String,
     val note: String,
     val typeText: String,
-    val externalId: String
+    val externalId: String,
+    val categoryName: String? = null,
+    val accountName: String? = null
 )
 
 data class ParsedBill(
     val rows: List<BillRow>,
     val skipped: Int,
-    val sourceLabel: String
+    val sourceLabel: String,
+    val containsAccounts: Boolean = false
 ) {
     val expenseTotal: Long get() = rows.filter { it.kind == TxnKind.EXPENSE }.sumOf { it.amountCents }
     val incomeTotal: Long get() = rows.filter { it.kind == TxnKind.INCOME }.sumOf { it.amountCents }

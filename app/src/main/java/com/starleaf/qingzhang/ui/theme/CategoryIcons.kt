@@ -60,6 +60,7 @@ object CategoryIcons {
         "flight" -> Icons.Rounded.Flight
         "fitness" -> Icons.Rounded.FitnessCenter
         "spa" -> Icons.Rounded.Spa
+        "more" -> Icons.Rounded.MoreHoriz
         "salary" -> Icons.Rounded.AccountBalanceWallet
         "award" -> Icons.Rounded.EmojiEvents
         "parttime" -> Icons.Rounded.Work

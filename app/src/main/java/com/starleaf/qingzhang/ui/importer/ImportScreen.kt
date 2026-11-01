@@ -171,6 +171,12 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             "我 → 服务 → 钱包 → 账单 → 右上角「常见问题」→ 下载账单 → 用于个人对账，解压密码会在微信服务通知里下发。"
                         )
                         Spacer(Modifier.height(10.dp))
+                        StepText(
+                            "3",
+                            "钱迹 / 其他应用",
+                            "在应用的数据导出中选择 CSV 或 JSON。轻账会按列名识别日期、金额、收支类型、分类和账户。"
+                        )
+                        Spacer(Modifier.height(10.dp))
                         Text(
                             "文件只在本机解析，不会上传。",
                             fontSize = 11.sp,
@@ -214,7 +220,7 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = if (fileName.isBlank()) "支持 CSV 和 ZIP 压缩包" else "点击重新选择",
+                                text = if (fileName.isBlank()) "支持 CSV、JSON 和 ZIP 压缩包" else "点击重新选择",
                                 fontSize = 11.sp,
                                 color = InkFaint
                             )
@@ -233,7 +239,7 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("解压密码（微信账单需要）") },
+                    label = { Text("解压密码（加密 ZIP 需要）") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -263,7 +269,7 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("导入到账户", fontSize = 11.sp, color = InkFaint)
+                            Text("默认账户", fontSize = 11.sp, color = InkFaint)
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 selectedAccount?.account?.name ?: "请先添加账户",
@@ -280,6 +286,14 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         )
                     }
                 }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "文件包含账户时按名称匹配或新建；未包含时使用默认账户。",
+                    fontSize = 10.sp,
+                    color = InkFaint,
+                    lineHeight = 15.sp
+                )
 
                 Spacer(Modifier.height(18.dp))
 
@@ -360,9 +374,19 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = Dates.timeLabel(row.time) + " · " + Dates.toLocalDate(
-                                                row.time
-                                            ).let { "${it.monthValue}月${it.dayOfMonth}日" },
+                                            text = buildString {
+                                                row.categoryName?.takeIf { it.isNotBlank() }
+                                                    ?.let { append(it).append(" · ") }
+                                                row.accountName?.takeIf { it.isNotBlank() }
+                                                    ?.let { append(it).append(" · ") }
+                                                val date = Dates.toLocalDate(row.time)
+                                                append(Dates.timeLabel(row.time))
+                                                append(" · ")
+                                                append(date.monthValue)
+                                                append("月")
+                                                append(date.dayOfMonth)
+                                                append("日")
+                                            },
                                             fontSize = 10.sp,
                                             color = InkFaint
                                         )
@@ -385,7 +409,7 @@ fun ImportScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             }
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                "转账、退款、关闭的交易不会被导入；重复导入不会产生重复记录。",
+                                "转账和不计收支的记录会被忽略；退款、关闭状态的支付宝/微信记录也会跳过。同一份账单重复导入不会产生重复记录。",
                                 fontSize = 10.sp,
                                 color = InkFaint,
                                 lineHeight = 16.sp

@@ -1,11 +1,12 @@
 {
-  "version": "1.0.0",
-  "notes": "首个版本：多账本、账户与分类管理，支付宝/微信账单导入，通知自动记账，浅色与深色主题，多源检查更新。",
-  "apk": "https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.0/qingzhang-v1.0.0.apk",
+  "version": "1.0.1",
+  "notes": "更换应用图标与欢迎页品牌形象；支持导入钱迹等应用导出的 CSV / JSON 账单；新增更新日志页面，检查更新与更新日志合并到同一入口。",
+  "apk": "https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.1/qingzhang-v1.0.1.apk",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.0/qingzhang-v1.0.0.apk",
-    "https://ghfast.top/https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.0/qingzhang-v1.0.0.apk",
-    "https://github.moeyy.xyz/https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.0/qingzhang-v1.0.0.apk"
+    "https://gh-proxy.com/https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.1/qingzhang-v1.0.1.apk",
+    "https://ghfast.top/https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.1/qingzhang-v1.0.1.apk",
+    "https://github.moeyy.xyz/https://github.com/RainxButterfly/LightAccounting/releases/download/v1.0.1/qingzhang-v1.0.1.apk"
   ],
-  "sha256": "9785e4bc5dbb4ff4a8723edf8bf4415fd58fef5bb9eee9fadf78e345f2dcca6f"
+  "sha256": "aba63721dc110e6bc555ae946069e33b97aa502a0a7661ca6f38272a03057d7d"
 }
+

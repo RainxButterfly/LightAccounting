@@ -81,4 +81,91 @@ class BillImporterTest {
         val error = runCatching { BillImporter.parse(text, "empty.csv") }.exceptionOrNull()
         assertTrue(error is BillImportException)
     }
+
+    @Test
+    fun `qianji csv keeps category account and skips transfers`() {
+        val text = """
+            日期,账户,类别,金额,类型,备注,对方户名
+            2026-10-30 12:30:00,支付宝,餐饮/午餐,38.50,支出,午餐,肯德基
+            2026-10-29 09:00:00,微信,交通/地铁,23.00,支出,地铁,
+            2026-10-28 10:00:00,银行卡,工资,8000.00,收入,10月工资,某某公司
+            2026-10-27 10:00:00,支付宝,内部转账,100.00,转账,转账,
+        """.trimIndent()
+
+        val parsed = BillImporter.parse(text, "钱迹导出.csv")
+
+        assertEquals(3, parsed.rows.size)
+        assertEquals(1, parsed.skipped)
+        assertEquals(6_150L, parsed.expenseTotal)
+        assertEquals(800_000L, parsed.incomeTotal)
+        assertEquals("钱迹账单", parsed.sourceLabel)
+        assertTrue(parsed.containsAccounts)
+
+        val first = parsed.rows.first()
+        assertEquals("支付宝", first.accountName)
+        assertEquals("餐饮/午餐", first.categoryName)
+        assertTrue(first.externalId.startsWith("import:"))
+    }
+
+    @Test
+    fun `qianji json reads nested account and category`() {
+        val text = """
+            {
+              "records": [
+                {
+                  "date": "2026-10-30 12:30:00",
+                  "account": {"name": "支付宝"},
+                  "category": {"name": "餐饮"},
+                  "amount": 38.5,
+                  "type": "支出",
+                  "note": "午餐",
+                  "counterparty": "肯德基"
+                },
+                {
+                  "date": "2026-10-28 10:00:00",
+                  "account": "银行卡",
+                  "category": "工资",
+                  "amount": "8000.00",
+                  "type": "收入",
+                  "note": "工资"
+                },
+                {
+                  "date": "2026-10-27 10:00:00",
+                  "account": "微信",
+                  "amount": 100,
+                  "type": "转账"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = BillImporter.parse(text, "钱迹备份.json")
+
+        assertEquals(2, parsed.rows.size)
+        assertEquals(1, parsed.skipped)
+        assertEquals(3_850L, parsed.expenseTotal)
+        assertEquals(800_000L, parsed.incomeTotal)
+        assertEquals("钱迹账单", parsed.sourceLabel)
+        assertTrue(parsed.containsAccounts)
+        assertEquals("支付宝", parsed.rows.first().accountName)
+        assertEquals("餐饮", parsed.rows.first().categoryName)
+    }
+
+    @Test
+    fun `generic csv supports split income and expense columns`() {
+        val text = """
+            日期,账户,支出金额,收入金额,分类,备注
+            2026-10-30,支付宝,38.50,,餐饮,午餐
+            2026-10-28,银行卡,,8000.00,工资,工资
+        """.trimIndent()
+
+        val parsed = BillImporter.parse(text, "账单.csv")
+
+        assertEquals(2, parsed.rows.size)
+        assertEquals(3_850L, parsed.expenseTotal)
+        assertEquals(800_000L, parsed.incomeTotal)
+        assertEquals(TxnKind.EXPENSE, parsed.rows[0].kind)
+        assertEquals(TxnKind.INCOME, parsed.rows[1].kind)
+        assertEquals("支付宝", parsed.rows[0].accountName)
+    }
 }

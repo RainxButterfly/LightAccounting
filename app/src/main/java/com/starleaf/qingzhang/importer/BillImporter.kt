@@ -3,11 +3,11 @@
  *
  * 作者: StarLeaf·Roxy (星河一叶Roxy)
  * 邮箱: ck_xuv@vip.qq.com
- * 日期: 2026-10-31
+ * 日期: 2026-11-01
  * 协议: Apache License 2.0
  *
  * 文件: BillImporter.kt
- * 说明: 支付宝与微信账单文件解析
+ * 说明: 支付宝、微信与第三方应用账单文件解析
  */
 
 package com.starleaf.qingzhang.importer
@@ -21,33 +21,25 @@ import kotlinx.coroutines.withContext
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.exception.ZipException
 import java.io.File
-import java.math.BigDecimal
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 object BillImporter {
 
-    private val timePatterns = listOf(
-        "yyyy-MM-dd HH:mm:ss",
-        "yyyy/M/d HH:mm:ss",
-        "yyyy-MM-dd HH:mm",
-        "yyyy/M/d HH:mm",
-        "yyyy-MM-dd'T'HH:mm:ss"
-    ).map { DateTimeFormatter.ofPattern(it) }
+    private const val MAX_FILE_BYTES = 50L * 1024 * 1024
 
     suspend fun load(context: Context, uri: Uri, password: String): ParsedBill =
         withContext(Dispatchers.IO) {
             val name = queryName(context, uri) ?: "账单文件"
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: throw BillImportException("无法读取这个文件，请重新选择")
+            if (bytes.size > MAX_FILE_BYTES) {
+                throw BillImportException("账单文件太大，请拆分后再导入")
+            }
 
             val text = if (isZip(bytes)) {
-                extractCsv(context, bytes, password)
+                extractText(context, bytes, password)
             } else {
                 decode(bytes)
             }
@@ -72,7 +64,7 @@ object BillImporter {
     private fun isZip(bytes: ByteArray): Boolean =
         bytes.size > 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()
 
-    private fun extractCsv(context: Context, bytes: ByteArray, password: String): String {
+    private fun extractText(context: Context, bytes: ByteArray, password: String): String {
         val temp = File(context.cacheDir, "bill_${System.currentTimeMillis()}.zip")
         temp.writeBytes(bytes)
         try {
@@ -86,10 +78,14 @@ object BillImporter {
                     zip.setPassword(password.toCharArray())
                 }
                 val header = zip.fileHeaders.firstOrNull {
-                    !it.isDirectory && it.fileName.endsWith(".csv", ignoreCase = true)
-                } ?: throw BillImportException("压缩包里没有找到 CSV 账单文件")
-                val csvBytes = zip.getInputStream(header).use { it.readBytes() }
-                return decode(csvBytes)
+                    !it.isDirectory &&
+                        (it.fileName.endsWith(".csv", ignoreCase = true) ||
+                            it.fileName.endsWith(".json", ignoreCase = true))
+                } ?: throw BillImportException(
+                    "压缩包里没有找到 CSV 或 JSON 账单。Excel 文件请先另存为 CSV。"
+                )
+                val contentBytes = zip.getInputStream(header).use { it.readBytes() }
+                return decode(contentBytes)
             }
         } catch (e: BillImportException) {
             throw e
@@ -118,15 +114,32 @@ object BillImporter {
     internal fun parse(text: String, fileName: String): ParsedBill {
         if (text.isBlank()) throw BillImportException("账单文件是空的")
 
-        val table = parseCsv(text)
+        val trimmed = text.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            return GenericBillParser.parseJson(trimmed, fileName)
+        }
+
+        val table = CsvParser.parse(text)
         val headerIndex = table.indexOfFirst { row ->
             row.firstOrNull()?.trim() == "交易时间"
         }
-        if (headerIndex < 0) {
-            throw BillImportException("没有找到账单表头，请选择支付宝或微信导出的账单 CSV")
+        if (headerIndex >= 0) {
+            val header = table[headerIndex].map { it.trim() }
+            val isPaymentBill = header.any { it.startsWith("收/支") } &&
+                header.any { it.startsWith("金额") }
+            if (isPaymentBill) {
+                return parsePaymentBill(table, headerIndex, header)
+            }
         }
 
-        val header = table[headerIndex].map { it.trim() }
+        return GenericBillParser.parseCsv(table, fileName)
+    }
+
+    private fun parsePaymentBill(
+        table: List<List<String>>,
+        headerIndex: Int,
+        header: List<String>
+    ): ParsedBill {
         fun col(vararg names: String): Int =
             header.indexOfFirst { cell -> names.any { cell.startsWith(it) } }
 
@@ -152,14 +165,12 @@ object BillImporter {
 
         val rows = ArrayList<BillRow>()
         var skipped = 0
-        val zone = ZoneId.systemDefault()
 
-        for (i in headerIndex + 1 until table.size) {
-            val row = table[i]
+        for (index in headerIndex + 1 until table.size) {
+            val row = table[index]
             if (row.all { it.isBlank() }) continue
 
-            val timeText = row.getOrNull(timeCol)?.trim().orEmpty()
-            val time = parseTime(timeText) ?: continue
+            val time = BillValues.parseTime(row.getOrNull(timeCol).orEmpty()) ?: continue
             val direction = row.getOrNull(directionCol)?.trim().orEmpty()
             val kind = when (direction) {
                 "支出" -> TxnKind.EXPENSE
@@ -169,7 +180,7 @@ object BillImporter {
                     continue
                 }
             }
-            val amount = parseAmount(row.getOrNull(amountCol).orEmpty())
+            val amount = BillValues.parseAmount(row.getOrNull(amountCol).orEmpty())
             if (amount == null || amount <= 0) {
                 skipped++
                 continue
@@ -186,16 +197,15 @@ object BillImporter {
             val goods = row.getOrNull(noteCol)?.trim().orEmpty()
             val typeText = row.getOrNull(typeCol)?.trim().orEmpty()
             val orderId = row.getOrNull(orderCol)?.trim().orEmpty()
-            val millis = time.atZone(zone).toInstant().toEpochMilli()
 
             val externalId = if (orderId.isNotBlank()) {
                 "bill:$orderId"
             } else {
-                "bill:" + sha1("$millis|$party|$goods|$amount|$kind")
+                "bill:" + BillValues.sha1("$time|$party|$goods|$amount|$kind")
             }
 
             rows += BillRow(
-                time = millis,
+                time = time,
                 amountCents = amount,
                 kind = kind,
                 counterparty = party,
@@ -209,75 +219,5 @@ object BillImporter {
             throw BillImportException("账单里没有可以导入的收支记录")
         }
         return ParsedBill(rows = rows, skipped = skipped, sourceLabel = sourceLabel)
-    }
-
-    private fun parseTime(text: String): LocalDateTime? {
-        if (text.isBlank()) return null
-        for (pattern in timePatterns) {
-            runCatching { return LocalDateTime.parse(text, pattern) }
-        }
-        return null
-    }
-
-    private fun parseAmount(text: String): Long? {
-        val cleaned = text.replace("¥", "").replace("￥", "")
-            .replace(",", "").replace("元", "").replace(" ", "").trim()
-        if (cleaned.isBlank()) return null
-        return runCatching {
-            BigDecimal(cleaned).movePointRight(2)
-                .setScale(0, java.math.RoundingMode.HALF_UP).toLong()
-        }.getOrNull()
-    }
-
-    private fun sha1(value: String): String {
-        val digest = MessageDigest.getInstance("SHA-1").digest(value.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun parseCsv(text: String): List<List<String>> {
-        val rows = ArrayList<List<String>>()
-        val row = ArrayList<String>()
-        val cell = StringBuilder()
-        var inQuotes = false
-        var i = 0
-        while (i < text.length) {
-            val c = text[i]
-            when {
-                inQuotes -> {
-                    if (c == '"') {
-                        if (i + 1 < text.length && text[i + 1] == '"') {
-                            cell.append('"')
-                            i++
-                        } else {
-                            inQuotes = false
-                        }
-                    } else {
-                        cell.append(c)
-                    }
-                }
-
-                c == '"' -> inQuotes = true
-                c == ',' -> {
-                    row.add(cell.toString())
-                    cell.clear()
-                }
-
-                c == '\r' -> Unit
-                c == '\n' -> {
-                    row.add(cell.toString())
-                    cell.clear()
-                    rows.add(ArrayList(row))
-                    row.clear()
-                }
-
-                else -> cell.append(c)
-            }
-            i++
-        }
-        if (cell.isNotEmpty() || row.isNotEmpty()) {
-            row.add(cell.toString())
-            rows.add(ArrayList(row))
-        }
-        return rows
     }
 }

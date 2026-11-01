@@ -50,6 +50,7 @@ import com.starleaf.qingzhang.ui.assets.AssetsScreen
 import com.starleaf.qingzhang.ui.books.BooksScreen
 import com.starleaf.qingzhang.ui.categories.CategoriesScreen
 import com.starleaf.qingzhang.ui.charts.ChartsScreen
+import com.starleaf.qingzhang.ui.changelog.ChangelogScreen
 import com.starleaf.qingzhang.ui.components.QianBottomBar
 import com.starleaf.qingzhang.ui.home.HomeScreen
 import com.starleaf.qingzhang.ui.importer.ImportScreen
@@ -193,7 +194,14 @@ private fun QingZhangMain(viewModel: AppViewModel) {
                         onOpenBooks = { navController.navigate("books") },
                         onOpenCategories = { navController.navigate("categories") },
                         onOpenImport = { navController.navigate("import") },
-                        onOpenInbox = { navController.navigate("inbox") }
+                        onOpenInbox = { navController.navigate("inbox") },
+                        onOpenChangelog = { navController.navigate("changelog") }
+                    )
+                }
+                composable("changelog") {
+                    ChangelogScreen(
+                        currentVersion = viewModel.appVersion,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable(

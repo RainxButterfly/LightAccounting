@@ -169,25 +169,89 @@ class AppRepository(private val db: AppDatabase) {
         accountId: Long,
         rows: List<BillRow>
     ): ImportCommit = db.withTransaction {
+        val accounts = accountDao.all()
+        val defaultAccount = accounts.firstOrNull { it.id == accountId }
+            ?: accounts.firstOrNull()
+            ?: return@withTransaction ImportCommit(imported = 0, duplicates = 0)
+
+        val accountCache = accounts.associateBy { it.name }.toMutableMap()
+        var nextAccountOrder = accounts.size
+
         val categories = categoryDao.all()
+        val categoryCache = categories.associateBy { "${it.kind.name}|${it.name}" }.toMutableMap()
+        var expenseOrder = categories.count { it.kind == TxnKind.EXPENSE }
+        var incomeOrder = categories.count { it.kind == TxnKind.INCOME }
+
+        suspend fun resolveAccount(name: String?): Account {
+            val trimmed = name?.trim()?.takeIf { it.isNotBlank() } ?: return defaultAccount
+            accountCache[trimmed]?.let { return it }
+
+            val aliasType = when (trimmed) {
+                "微信", "微信支付" -> AccountType.WECHAT
+                "支付宝", "支付宝账户" -> AccountType.ALIPAY
+                "现金" -> AccountType.CASH
+                else -> null
+            }
+            if (aliasType != null) {
+                accounts.firstOrNull { it.type == aliasType }?.let {
+                    accountCache[trimmed] = it
+                    return it
+                }
+            }
+
+            val draft = Account(
+                name = trimmed.take(24),
+                type = AccountType.OTHER,
+                sortOrder = nextAccountOrder++
+            )
+            val id = accountDao.insert(draft)
+            val stored = draft.copy(id = id)
+            accountCache[trimmed] = stored
+            return stored
+        }
+
+        suspend fun resolveCategory(row: BillRow): Category {
+            val fromFile = row.categoryName?.trim()?.takeIf { it.isNotBlank() }
+            val name = normalizeCategoryName(
+                fromFile ?: CategoryRules.match(
+                    row.kind,
+                    row.counterparty,
+                    row.note,
+                    row.typeText
+                )
+            ).ifBlank {
+                if (row.kind == TxnKind.INCOME) "其他收入" else "其他"
+            }.take(20)
+            val key = "${row.kind.name}|$name"
+            categoryCache[key]?.let { return it }
+
+            val order = when (row.kind) {
+                TxnKind.INCOME -> incomeOrder++
+                else -> expenseOrder++
+            }
+            val draft = Category(
+                name = name,
+                iconKey = if (row.kind == TxnKind.INCOME) "more_income" else "more",
+                colorIndex = Math.floorMod(name.hashCode(), 22),
+                kind = row.kind,
+                sortOrder = order
+            )
+            val id = categoryDao.insert(draft)
+            val stored = draft.copy(id = id)
+            categoryCache[key] = stored
+            return stored
+        }
+
         var imported = 0
         var duplicates = 0
 
         rows.forEach { row ->
-            val categoryName = CategoryRules.match(
-                row.kind,
-                row.counterparty,
-                row.note,
-                row.typeText
-            )
-            val category = categories.firstOrNull {
-                it.name == categoryName && it.kind == row.kind
-            }
+            val category = resolveCategory(row)
             val id = txnDao.insert(
                 Txn(
                     bookId = bookId,
-                    accountId = accountId,
-                    categoryId = category?.id,
+                    accountId = resolveAccount(row.accountName).id,
+                    categoryId = category.id,
                     kind = row.kind,
                     amount = row.amountCents,
                     time = row.time,
@@ -200,5 +264,12 @@ class AppRepository(private val db: AppDatabase) {
             if (id == -1L) duplicates++ else imported++
         }
         ImportCommit(imported = imported, duplicates = duplicates)
+    }
+
+    private fun normalizeCategoryName(value: String): String {
+        val first = value.split('/', '>', '|', '\\', '＞')
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() }
+        return first ?: value.trim()
     }
 }

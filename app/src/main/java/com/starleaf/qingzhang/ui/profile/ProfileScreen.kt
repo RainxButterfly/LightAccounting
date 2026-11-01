@@ -16,6 +16,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,12 +34,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsNone
@@ -59,7 +63,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,7 +75,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starleaf.qingzhang.AppInfo
+import com.starleaf.qingzhang.R
 import com.starleaf.qingzhang.ui.AppViewModel
+import com.starleaf.qingzhang.ui.changelog.Changelog
 import com.starleaf.qingzhang.ui.components.AppCard
 import com.starleaf.qingzhang.ui.components.GroupTitle
 import com.starleaf.qingzhang.ui.components.SettingsRow
@@ -89,12 +97,14 @@ fun ProfileScreen(
     onOpenBooks: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenImport: () -> Unit,
-    onOpenInbox: () -> Unit
+    onOpenInbox: () -> Unit,
+    onOpenChangelog: () -> Unit
 ) {
     val book by viewModel.currentBook.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val currentChangelog = Changelog.entries.firstOrNull { it.version == viewModel.appVersion }
     val context = LocalContext.current
     var notificationEnabled by remember {
         mutableStateOf(viewModel.isNotificationAccessEnabled(context))
@@ -183,7 +193,7 @@ fun ProfileScreen(
                     SettingsRow(
                         icon = Icons.Rounded.UploadFile,
                         title = "账单导入",
-                        value = "支付宝 / 微信",
+                        value = "CSV / JSON",
                         tint = AmberDeep,
                         onClick = onOpenImport
                     )
@@ -234,19 +244,101 @@ fun ProfileScreen(
                 Spacer(Modifier.height(20.dp))
                 GroupTitle("其他")
                 AppCard {
-                    SettingsRow(
-                        icon = Icons.Rounded.SystemUpdate,
-                        title = "检查更新",
-                        value = when {
-                            updateState is UpdateUiState.Checking -> "检查中…"
-                            updateState is UpdateUiState.Available ||
-                                updateState is UpdateUiState.Downloading ||
-                                updateState is UpdateUiState.Ready -> "有新版本"
-                            else -> "v${viewModel.appVersion}"
-                        },
-                        tint = AmberDeep,
-                        onClick = { viewModel.checkForUpdates(true) }
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable { viewModel.checkForUpdates(true) }
+                                .padding(start = 16.dp, end = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(AmberDeep.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.SystemUpdate,
+                                    null,
+                                    tint = AmberDeep,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = "检查更新",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Ink
+                                )
+                                Text(
+                                    text = when {
+                                        updateState is UpdateUiState.Checking -> "检查中…"
+                                        updateState is UpdateUiState.Available ||
+                                            updateState is UpdateUiState.Downloading ||
+                                            updateState is UpdateUiState.Ready -> "有新版本"
+                                        else -> "v${viewModel.appVersion}"
+                                    },
+                                    fontSize = 10.sp,
+                                    color = InkFaint
+                                )
+                            }
+                        }
+
+                        Box(
+                            Modifier
+                                .width(1.dp)
+                                .height(28.dp)
+                                .background(Line)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable(onClick = onOpenChangelog)
+                                .padding(start = 10.dp, end = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(InkSoft.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.History,
+                                    null,
+                                    tint = InkSoft,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "更新日志",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Ink,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                null,
+                                tint = InkFaint,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     Divider()
                     SettingsRow(
                         icon = Icons.Rounded.Info,
@@ -297,8 +389,23 @@ fun ProfileScreen(
                         .heightIn(max = 420.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
+                    Box(
+                        Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_brand),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "轻账 v${viewModel.appVersion}",
+                        text = "轻账 v${viewModel.appVersion}" +
+                            (currentChangelog?.let { " · ${it.date}" } ?: ""),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Ink
@@ -324,7 +431,7 @@ fun ProfileScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "账本和流水只保存在本机，联网仅用于检查更新，不会上传记账数据。\n\n账单导入使用支付宝、微信官方导出的文件；通知自动记账只读取两条支付通道的付款通知，不读取聊天内容。",
+                        text = "账本和流水只保存在本机，联网仅用于检查更新，不会上传记账数据。\n\n账单导入支持支付宝、微信官方账单，以及钱迹等应用导出的 CSV / JSON；通知自动记账只读取微信支付和支付宝的付款通知，不读取聊天内容。",
                         fontSize = 12.sp,
                         color = InkSoft,
                         lineHeight = 19.sp

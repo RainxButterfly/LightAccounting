@@ -15,6 +15,7 @@ package com.starleaf.qingzhang.ui.onboarding
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +54,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -63,6 +66,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.starleaf.qingzhang.AppInfo
+import com.starleaf.qingzhang.R
 import com.starleaf.qingzhang.ui.components.PrimaryButton
 import com.starleaf.qingzhang.ui.theme.Amber
 import com.starleaf.qingzhang.ui.theme.AmberDeep
@@ -75,14 +79,16 @@ import com.starleaf.qingzhang.ui.theme.Paper
 import kotlinx.coroutines.launch
 
 private data class GuidePage(
-    val icon: ImageVector,
+    val icon: ImageVector?,
     val title: String,
-    val body: String
+    val body: String,
+    val imageRes: Int? = null
 )
 
 private val guidePages = listOf(
     GuidePage(
-        icon = Icons.Rounded.AccountBalanceWallet,
+        icon = null,
+        imageRes = R.drawable.ic_brand,
         title = "欢迎使用轻账",
         body = "把每一笔收入和支出记清楚。账本、账户和流水都只保存在这台设备上，不需要注册账号。"
     ),
@@ -240,12 +246,21 @@ private fun GuidePageContent(page: GuidePage) {
                 .background(AmberSoft),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = page.icon,
-                contentDescription = null,
-                tint = AmberDeep,
-                modifier = Modifier.size(52.dp)
-            )
+            if (page.imageRes != null) {
+                Image(
+                    painter = painterResource(page.imageRes),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = page.icon ?: Icons.Rounded.AccountBalanceWallet,
+                    contentDescription = null,
+                    tint = AmberDeep,
+                    modifier = Modifier.size(52.dp)
+                )
+            }
         }
         Spacer(Modifier.height(30.dp))
         Text(
