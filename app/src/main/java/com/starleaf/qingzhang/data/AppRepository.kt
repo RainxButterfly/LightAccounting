@@ -267,7 +267,7 @@ class AppRepository(private val db: AppDatabase) {
     }
 
     private fun normalizeCategoryName(value: String): String {
-        val first = value.split('/', '>', '|', '\\', '＞')
+        val first = value.split('/', '>', '|', '\\', '＞', '、', '，')
             .map { it.trim() }
             .firstOrNull { it.isNotBlank() }
         return first ?: value.trim()

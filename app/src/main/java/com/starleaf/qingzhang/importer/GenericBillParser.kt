@@ -21,7 +21,8 @@ object GenericBillParser {
 
     private val timeAliases = setOf(
         "日期时间", "日期", "时间", "记账日期", "记账时间", "交易时间", "记录时间", "创建时间",
-        "datetime", "date", "time", "timestamp"
+        "datetime", "date", "time", "timestamp",
+        "recordtime", "createdat", "createdtime", "tradetime", "billtime", "occurtime"
     )
     private val amountAliases = setOf(
         "金额", "交易金额", "发生金额", "amount", "money", "total"
@@ -47,7 +48,8 @@ object GenericBillParser {
         "对方户名", "交易对方", "对方", "商户名称", "商户", "merchant", "counterparty", "payee"
     )
     private val idAliases = setOf(
-        "交易单号", "交易订单号", "订单号", "单号", "transaction_id", "transactionid", "order_id", "id"
+        "交易单号", "交易订单号", "订单号", "单号", "transaction_id", "transactionid",
+        "order_id", "recordid", "billid", "uuid", "id"
     )
     private val ignoreAliases = setOf("不计收支", "不计入收支")
 
